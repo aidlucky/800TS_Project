@@ -1,0 +1,134 @@
+<html>
+{% load staticfiles %}
+	<head>
+		<meta charset="utf-8"> 
+		<title>排班</title>
+		<meta content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" name="viewport">
+		<!-- Bootstrap 3.3.7 -->
+		<link rel="stylesheet" type="text/css" href="{% static 'css/bootstrap.min.css' %}">
+		<!-- Font Awesome -->
+		<link rel="stylesheet" type="text/css" href="{% static 'css/font-awesome.min.css' %}">
+		<!-- Ionicons -->
+		<link rel="stylesheet" type="text/css" href="{% static 'css/ionicons.min.css' %}">
+		<!-- Theme style -->
+		<link rel="stylesheet" type="text/css" href="{% static 'css/AdminLTE.min.css' %}">
+		<!-- DataTables -->
+		<link rel="stylesheet" href="{% static 'css/dataTables.bootstrap.min.css' %}">
+		<!-- AdminLTE Skins. Choose a skin from the css/skins
+			folder instead of downloading all of them to reduce the load. -->
+		<link rel="stylesheet" href="{% static 'css/_all-skins.min.css' %}">
+		<!-- Morris chart -->
+		<link rel="stylesheet" href="{% static 'css/morris.css' %}">
+		<!-- jvectormap -->
+		<link rel="stylesheet" href="{% static 'css/jquery-jvectormap.css' %}">
+		<!-- bootstrap wysihtml5 - text editor -->
+		<link rel="stylesheet" href="{% static 'css/bootstrap3-wysihtml5.min.css' %}">
+		<!-- Select2 -->
+		<link rel="stylesheet" href="{% static 'css/select2.min.css' %}">
+
+		<script src="{% static 'js/jquery.min.js' %}" ></script>
+		<script src="{% static 'js/bootstrap.min.js' %}" ></script>
+
+	</head>
+
+	<body>
+		<form action="/get_template/" method="post">{% csrf_token %}
+			<div style="text-align:right;">
+				<button type="submit" class="btn btn-primary pull-center" style="margin-right: 5px;">
+				<i class="fa fa-download"></i> 下载模板
+				</button>
+			</div>
+		</form>
+
+        {% if error_message %}
+            <div id="myAlert" class="alert alert-danger alert-dismissable">
+                <button type="button" class="close" data-dismiss="alert"
+                        aria-hidden="true">
+                    &times;
+                </button>
+
+                {% for error in error_message %}
+			    	<p>{{ error }}</p>
+		    	{% endfor %}
+
+            </div>
+        {% endif %}
+
+		<form action="" method="post" enctype="multipart/form-data">{% csrf_token %}
+			<label>请选择Excel文件</label>
+			<input class="form-control" type="file" id="excel" name="excel">
+			<br>
+			<table class="table table-bordered table-striped" >
+				<thead>
+					<tr>
+						<th>班次间隔:<input type="text" id="rest_hours" name="rest_hours" value="12">小时</th>
+					</tr>
+				</thead>
+			</table>
+
+			<!-- 2019/6/10 add -->
+			<div style="margin-left: 30px;">
+				<tr>
+					<th>连续上班天数不得超过：
+					<input type="text" id="continue_work_days" name="continue_work_days" value="4">
+					</th>天:(默认5天)<br>
+
+					<input type="checkbox" value="isOFF" name="checkbox_list">
+					是否平均分配员工休息时间; (条件：当人力富余时)<br>
+					
+					<input type="checkbox" value="isPerson" name="checkbox_list">
+					是否平均分配员工不同班次; (条件: 优先满足偏好班次)<br>
+					
+					<input type="checkbox" value="isGroup" name="checkbox_list">
+					是否同一组别班次相同; (条件: 优先满足偏好班次)<br>
+
+				</tr>				
+			</div>
+			<div style="text-align:center;">
+				<input type="submit" class="btn btn-primary" onclick="return submit_check()" value="提交" />
+			</div>
+
+
+		</form>
+	<script>
+	function submit_check()
+	{
+		if (document.getElementById('excel').value.length === 0)
+		{
+			alert("请先选择Excel文件！");
+			return false;
+		}
+		if (document.getElementById('continue_work_days').value.length === 0)
+		{
+			alert("请先填写连续作休天数！");
+			return false;
+		}
+
+		if (document.getElementById('sleep_hours').value.length === 0)
+		{
+			alert("请先填写班次间隔时间！");
+			return false;
+		}
+		if (isNaN(document.getElementById('continue_work_days').value) || isNaN(document.getElementById('continue_sleep_days').value) )
+		{
+			alert("作息天数必须为数字！");
+			return false;
+		}
+		if (isNaN(document.getElementById('sleep_hours').value))
+		{
+			alert("班次间隔必须为数字！");
+			return false;
+		}
+		return true;
+	}
+
+	$(function(){
+		$(".close").click(function(){
+			$("#myAlert").alert('close');
+		});
+	});
+	</script>
+	</body>
+
+
+</html>
