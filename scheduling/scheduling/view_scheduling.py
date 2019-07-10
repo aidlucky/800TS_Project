@@ -88,7 +88,6 @@ def sehceduing(request):
             response['Content-Disposition'] = 'attachment;filename={0}'.format(urlquote(file_name))
             return response
 
-
 # 第六部分 下载模板
 def get_template(request):
     if request.method == 'GET':
@@ -481,9 +480,7 @@ class scheduling_excel():
                 # 规则1，加入日期，离职日期,班次为空
                 gz1 = (self.people_info[p]['join_date'] and self.people_info[p]['join_date'] > d) or (
                         self.people_info[p]['quit_date'] and self.people_info[p]['quit_date'] < d)
-                # 为OFF的情况
-                # 规则2 ,指定休息
-                # gz2 = d in self.people_info[p]['appoint_rest']
+
                 # 规则3,周休,行政班
                 # gz3 = (str(self.people_info[p]['week_rest']).upper() == 'Y' and d.weekday() >= 5)
                 if gz1:
@@ -528,11 +525,22 @@ class scheduling_excel():
             如果当前人员连续工作的天数大于限定的工作天数则暂时不给该员工进行排班，同时将该员工的姓名作为字
             典的键，连续工作天数作为字典的值存入指定的字典中。
             '''
+
             while True:
                 if not L:
                     break
                 Flag = True
                 person = random.choice(L)
+
+                if (self.people_info[person]['join_date'] and self.people_info[person]['join_date'] > dat) \
+                    or (self.people_info[person]['quit_date'] and self.people_info[person]['quit_date'] < dat):
+                    L.remove(person)
+                    continue
+
+
+                # 判断员工某一天是否指定要休息
+                # gz2 = d in self.people_info[p]['appoint_rest']
+
                 for var2 in middle_list:
                     if not var2['appoint'] and var2['date'] == dat and var2['name'] == person:
                         var2['shift'] = self.get_fit_shift(var2['date'], var2['name'],Flag)
