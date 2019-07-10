@@ -532,14 +532,17 @@ class scheduling_excel():
                 Flag = True
                 person = random.choice(L)
 
+                # 判断当前员工是否已经到岗或离职
                 if (self.people_info[person]['join_date'] and self.people_info[person]['join_date'] > dat) \
                     or (self.people_info[person]['quit_date'] and self.people_info[person]['quit_date'] < dat):
                     L.remove(person)
                     continue
 
-
                 # 判断员工某一天是否指定要休息
-                # gz2 = d in self.people_info[p]['appoint_rest']
+                if dat in self.people_info[person]['appoint_rest']:
+                    OFF_dic[person] = 1000
+                    L.remove(person)
+                    continue
 
                 for var2 in middle_list:
                     if not var2['appoint'] and var2['date'] == dat and var2['name'] == person:
