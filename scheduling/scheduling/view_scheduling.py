@@ -478,11 +478,9 @@ class scheduling_excel():
         for d in self.date_list:  # 循环 排班周期 中的每一天，比如 从5月1日到 5月30日
             for p in self.people_info:  # 循环大字典中的每一个人
                 # 规则1，加入日期，离职日期,班次为空
-                gz1 = (self.people_info[p]['join_date'] and self.people_info[p]['join_date'] > d) or (
-                        self.people_info[p]['quit_date'] and self.people_info[p]['quit_date'] < d)
+                gz1 = (self.people_info[p]['join_date'] and self.people_info[p]['join_date'] > d) \
+                      or (self.people_info[p]['quit_date'] and self.people_info[p]['quit_date'] < d)
 
-                # 规则3,周休,行政班
-                # gz3 = (str(self.people_info[p]['week_rest']).upper() == 'Y' and d.weekday() >= 5)
                 if gz1:
                     self.dataframe.append({
                         'date': d,
@@ -490,13 +488,7 @@ class scheduling_excel():
                         'shift': '',
                         'appoint': True,
                     })
-                # elif gz3:
-                #     self.dataframe.append({
-                #         'date': d,
-                #         'name': p,
-                #         'shift': 'OFF',
-                #         'appoint': True,
-                #     })
+
                 else:
                     self.dataframe.append({
                         'date': d,
@@ -508,14 +500,17 @@ class scheduling_excel():
         # 当给某一天排班时，随机从现有人员中选择一人，进行排班，
         # 这样可以有效的避免班次和OFF集中在某个区域的情况
         people_list = []
-        for var in self.people_info:
-            people_list.append(var)
-
-        L = copy.deepcopy(people_list)
-        middle_list = [] # 存储每一天所对应的dataframe中的数据
-        OFF_dic = {} # 暂时存放连续工作的天数大于指定天数的人员
+        admin_shift = [] # 存放需要上行政班人员的姓名
+        middle_list = []  # 存储每一天所对应的dataframe中的数据
+        OFF_dic = {}  # 暂时存放连续工作的天数大于指定天数的人员
 
         for dat in self.date_list:
+            for var in self.people_info:
+                if str(self.people_info[var]['week_rest']).upper() == 'Y':
+                    admin_shift.append(var)
+                else:
+                    people_list.append(var)
+
             for var1 in self.dataframe:
                 if var1['date'] == dat:
                     middle_list.append(var1)
@@ -525,23 +520,45 @@ class scheduling_excel():
             如果当前人员连续工作的天数大于限定的工作天数则暂时不给该员工进行排班，同时将该员工的姓名作为字
             典的键，连续工作天数作为字典的值存入指定的字典中。
             '''
+            while True:
+                if not admin_shift:
+                    break
+                Flag = 'ADMIN'
+                admin_person = random.choice(admin_shift)
+
+                # 判断当前员工是否已经到岗或离职
+                if (self.people_info[admin_person]['join_date'] and self.people_info[admin_person]['join_date'] > dat) \
+                        or (self.people_info[admin_person]['quit_date'] and self.people_info[admin_person]['quit_date'] < dat):
+                    admin_shift.remove(admin_person)
+                    continue
+
+                # 判断员工某一天是否指定要休息
+                if dat in self.people_info[admin_person]['appoint_rest']:
+                    OFF_dic[admin_person] = 1000
+                    admin_shift.remove(admin_person)
+                    continue
+
+                for dic in middle_list:
+                    if not dic['appoint'] and dic['date'] == dat and dic['name'] == admin_person:
+                        dic['shift'] = self.get_fit_shift(dic['date'], dic['name'], Flag)
+                        admin_shift.remove(admin_person)
 
             while True:
-                if not L:
+                if not people_list:
                     break
-                Flag = True
-                person = random.choice(L)
+                Flag = 'T'
+                person = random.choice(people_list)
 
                 # 判断当前员工是否已经到岗或离职
                 if (self.people_info[person]['join_date'] and self.people_info[person]['join_date'] > dat) \
                     or (self.people_info[person]['quit_date'] and self.people_info[person]['quit_date'] < dat):
-                    L.remove(person)
+                    people_list.remove(person)
                     continue
 
                 # 判断员工某一天是否指定要休息
                 if dat in self.people_info[person]['appoint_rest']:
                     OFF_dic[person] = 1000
-                    L.remove(person)
+                    people_list.remove(person)
                     continue
 
                 for var2 in middle_list:
@@ -549,8 +566,8 @@ class scheduling_excel():
                         var2['shift'] = self.get_fit_shift(var2['date'], var2['name'],Flag)
                         if type(var2['shift']) is int:
                             OFF_dic[person] = var2['shift']
-                        L.remove(person)
-            print(OFF_dic)
+                        people_list.remove(person)
+            # print(OFF_dic)
 
             '''
             从OFF_dic字典中优先取出连续工作天数最短的人员，进行排班，因为当人员需求没有被满足时，
@@ -559,17 +576,16 @@ class scheduling_excel():
             while True:
                 if not OFF_dic:
                     break
-                Flag = False
+                Flag = 'F'
                 personal = min(OFF_dic, key=OFF_dic.get)
 
                 for var3 in middle_list:
                     if not var3['appoint'] and var3['date'] == dat and var3['name'] == personal:
                         var3['shift'] = self.get_fit_shift(var3['date'], var3['name'],Flag)
                         del OFF_dic[personal]
-            print(dat)
+            # print(dat)
 
             middle_list.clear()
-            L = copy.deepcopy(people_list)
 
     def get_fit_shift(self, date, people,Flag):
         dic = {}  # 用于打分
@@ -602,13 +618,24 @@ class scheduling_excel():
                 if gz2 and  gz1:
                     dic[s] = dic[s] + 1
 
+            if Flag == 'ADMIN':
+                if date.weekday() >= 5 and self.current_OFF_num(date):
+                    dic['OFF'] += 10000
+                else:
+                    if gz1:
+                        dic['C1'] += 10000
+                    else:
+                        dic['B2'] += 10000
+
+
 
             # OFF平均化,判断当前连续工作天数是否大于或等于指定的天数，
             # 大于的话则执行以下代码，并返回该员工连续工作天数
             continue_WD_web = self.people_info[people]['continue_work_days']
             continue_WD = self.get_people_continue_work_days(date, people)
-            if continue_WD >= continue_WD_web and Flag:
+            if continue_WD >= continue_WD_web and Flag == 'T':
                 return int(continue_WD)
+
 
             # 获取平均休息天数和平均班次数量
             # average_off_num,average_shift_num = self.get_people_off_and_work_days()
@@ -710,6 +737,41 @@ class scheduling_excel():
 
         # 返回权重最高的班次,就是dic字典中value值最大的那个key
         return max(dic, key=dic.get)
+
+    # 计算当前排班日期剩余的OFF数量
+    def current_OFF_num(self,date):
+        current_date_arranged_off_num = 0  # 当前日期已排OFF数量
+        current_date_total_require_num = 0 # 当前日期总需求数量
+        current_date_total_people_num = len(self.people_info) # 当前日期总人力数量
+        not_join_or_quit_num = 0 # 当前日期未加入人员和已离职人员的数量
+
+        for var in self.dataframe:
+            if var['date'] == date and var['shift'] == 'OFF':
+                current_date_arranged_off_num += 1
+
+        for _,dic in self.sheduling_info.items():
+            for k, v in dic.items():
+                if k == date:
+                    current_date_total_require_num += v
+
+        for _,value in self.people_info.items():
+            if (value['join_date'] and value['join_date'] > date) or (value['quit_date'] and value['quit_date'] < date):
+                not_join_or_quit_num += 1
+
+        # 计算当前日期总OFF数量
+        current_date_total_off_num = (current_date_total_people_num - not_join_or_quit_num) - current_date_total_require_num
+
+        # 计算当前日期剩余OFF数量
+        current_date_remain_OFF_num = current_date_total_off_num - current_date_arranged_off_num
+
+        print('日期：',date,'当前日期总OFF数量：',current_date_total_off_num,'当前日期剩余OFF数量：',current_date_remain_OFF_num)
+
+        if current_date_remain_OFF_num >= current_date_remain_OFF_num:
+            return False
+        else:
+            return True
+
+
 
     # 获取当前人员已排班次的平均分
     def get_people_arranged_avg_score(self, people):
