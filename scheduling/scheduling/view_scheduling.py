@@ -520,6 +520,7 @@ class scheduling_excel():
             如果当前人员连续工作的天数大于限定的工作天数则暂时不给该员工进行排班，同时将该员工的姓名作为字
             典的键，连续工作天数作为字典的值存入指定的字典中。
             '''
+
             while True:
                 if not admin_shift:
                     break
@@ -598,7 +599,7 @@ class scheduling_excel():
             # OK 规则1 判断是否满足需求人数
             gz1 = self.sheduling_info[s][date] > self.get_arranged(s, date)
             if gz1:
-                dic[s] = dic[s] + 1
+                dic[s] = dic[s] + 2
 
             # OK 规则2 保证休息时间足够，距离上次下班时间超过sleep_hour小时
             # 判断是否是排班周期第一天
@@ -618,16 +619,6 @@ class scheduling_excel():
                 if gz2 and  gz1:
                     dic[s] = dic[s] + 1
 
-            if Flag == 'ADMIN':
-                if date.weekday() >= 5 and self.current_OFF_num(date):
-                    dic['OFF'] += 10000
-                else:
-                    if gz1:
-                        dic['C1'] += 10000
-                    else:
-                        dic['B2'] += 10000
-
-
 
             # OFF平均化,判断当前连续工作天数是否大于或等于指定的天数，
             # 大于的话则执行以下代码，并返回该员工连续工作天数
@@ -636,6 +627,15 @@ class scheduling_excel():
             if continue_WD >= continue_WD_web and Flag == 'T':
                 return int(continue_WD)
 
+        if Flag == 'ADMIN':
+            if date.weekday() >= 5:
+                # 判断给当前日期和当前人员排OFF时，当前剩余OFF数量是否足够，如果OFF数量为0，则不能给当前人员强制排OFF
+                if self.current_OFF_num(date):
+                    dic['OFF'] += 10000
+            elif self.sheduling_info['C1'][date] > self.get_arranged('C1', date):
+                dic['C1'] += 10000
+            else:
+                dic['B2'] += 10000
 
             # 获取平均休息天数和平均班次数量
             # average_off_num,average_shift_num = self.get_people_off_and_work_days()
@@ -764,14 +764,12 @@ class scheduling_excel():
         # 计算当前日期剩余OFF数量
         current_date_remain_OFF_num = current_date_total_off_num - current_date_arranged_off_num
 
-        print('日期：',date,'当前日期总OFF数量：',current_date_total_off_num,'当前日期剩余OFF数量：',current_date_remain_OFF_num)
+        # print('日期：',date,'当前日期总OFF数量：',current_date_total_off_num,'当前日期剩余OFF数量：',current_date_remain_OFF_num)
 
-        if current_date_remain_OFF_num >= current_date_remain_OFF_num:
+        if current_date_remain_OFF_num == 0:
             return False
         else:
             return True
-
-
 
     # 获取当前人员已排班次的平均分
     def get_people_arranged_avg_score(self, people):
