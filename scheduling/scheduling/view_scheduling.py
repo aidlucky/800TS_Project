@@ -1081,8 +1081,7 @@ class scheduling_excel():
                                     # print(self.get_shift_start_work_date_time(var['shift'],d),self.people_info[p]['before_schedule_off_date'],d,p)
                                     if ((self.get_shift_start_work_date_time(var['shift'], d) - self.people_info[p][
                                         'before_schedule_off_date']).total_seconds() < (REST_HOURS * 3600)):
-                                        worksheet.write(np + 2 + len(shift_in_shift), nd + 2, var['shift'],
-                                                        warning_cell_format)  # warning_cell_format
+                                        worksheet.write(np + 2 + len(shift_in_shift), nd + 2, var['shift'], warning_cell_format)  # warning_cell_format
                                         warning_cell_list.append((var['shift'], p, d))  # 2019/6/21 add
                                     else:
                                         worksheet.write(np + 2 + len(shift_in_shift), nd + 2, var['shift'], cell_format)
@@ -1093,14 +1092,14 @@ class scheduling_excel():
                                 yesterday_off_work_time = self.get_people_off_work_time((d + timedelta(days=-1)), p)
                                 # 获取班次上班时间，计算休息时长
 
-                                if ((self.get_shift_start_work_date_time(var['shift'],
-                                                                         d) - yesterday_off_work_time).total_seconds() >= (
+                                if ((self.get_shift_start_work_date_time(var['shift'], d) - yesterday_off_work_time).total_seconds() >= (
                                         REST_HOURS * 3600)):
                                     worksheet.write(np + 2 + len(shift_in_shift), nd + 2, var['shift'], cell_format)
                                 else:
                                     worksheet.write(np + 2 + len(shift_in_shift), nd + 2, var['shift'],
                                                     warning_cell_format)  # warning_cell_format
-                                    warning_cell_list.append((var['shift'], p, d))  # 2019/6/21 add
+                                    if not self.people_info[p]['quit_date']:#为修复 sheet 异常排班提示信息加入 2019/7/11 add
+                                        warning_cell_list.append((var['shift'], p, d))  # 2019/6/21 add
 
             worksheet.write(np + 2 + len(shift_in_shift), len(self.date_list) + 2, self.calculate_people_sleep_days(p),
                             cell_format)
@@ -1140,6 +1139,7 @@ class scheduling_excel():
             worksheetAlert.write(n + 1, 2, d[2], format)
             # worksheetAlert.write(n+1, 3, "两个班次之间的休息时间小于%d小时" % REST_HOURS )
             worksheetAlert.merge_range(n + 1, 3, n + 1, 6, "两个班次之间的休息时间小于%d小时" % REST_HOURS, format)
+
 
         workbook.close()
 

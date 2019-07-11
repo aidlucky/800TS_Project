@@ -123,8 +123,10 @@ USE_TZ = True
 STATIC_URL = '/static/'
 STATICFILES = os.path.join(BASE_DIR, 'static')
 STATICFILES_DIRS = [
-    os.path.join(BASE_DIR, "static")
+    os.path.join(BASE_DIR, "collectstatic")
 ]
+
+STATIC_ROOT = os.path.join(BASE_DIR, "static")
 
 logging.basicConfig(level=logging.DEBUG,
                     format='%(asctime)s %(filename)s [line:%(lineno)d] %(levelname)s %(message)s',
