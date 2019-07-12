@@ -1,7 +1,7 @@
 <html>
 {% load staticfiles %}
 	<head>
-		<meta charset="utf-8"> 
+		<meta charset="utf-8">
 		<title>排班</title>
 		<meta content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" name="viewport">
 		<!-- Bootstrap 3.3.7 -->
@@ -75,14 +75,14 @@
 
 					<input type="checkbox" value="isOFF" name="checkbox_list">
 					是否平均分配员工休息时间; (条件：当人力富余时)<br>
-					
+
 					<input type="checkbox" value="isPerson" name="checkbox_list">
 					是否平均分配员工不同班次; (条件: 优先满足偏好班次)<br>
-					
+
 					<input type="checkbox" value="isGroup" name="checkbox_list">
 					是否同一组别班次相同; (条件: 优先满足偏好班次)<br>
 
-				</tr>				
+				</tr>
 			</div>
 			<div style="text-align:center;">
 				<input type="submit" class="btn btn-primary" onclick="return submit_check()" value="提交" />

@@ -2,15 +2,10 @@ from django.shortcuts import render
 import os
 from django.http import FileResponse
 from django.utils.http import urlquote
-from django.http import HttpResponseRedirect
 import xlrd
 import xlsxwriter
-import logging
 from datetime import *
 import random
-import math
-import time
-import copy
 
 REST_HOURS = 14  # 班次间隔
 CONTINUE_WORK_DAYS = 5  # 连续上班天数
@@ -52,7 +47,7 @@ def sehceduing(request):
         # 第三部分 生成排班结果数据
         se.generate_dataframe()
 
-        # test code
+        # lucky test code
         # print('-' * 50 + 'people_info 人员信息' + '-' * 200)
         # print(se.people_info)
         #
@@ -287,15 +282,10 @@ class scheduling_excel():
 
             # 排班性质  5月30日  只要中间有减号，两边有数字，就是正常,干10天休10天，干100天休100天，不必两边相加等于7
             if t1.cell(row, 10).value:
-                if t1.cell(row, 10).value.strip() not in shift_in_shift:
-                    self.error_message.append('人员表第' + str(row + 1) + '行，指定排班，没有存在于班次表中' + t1.cell(row, 10).value)
-                #     try:
-                #         float(t1.cell(row, 10).value.split('-')[0])
-                #         float(t1.cell(row, 10).value.split('-')[1])
-                #     except:
-                #         self.error_message.append('人员表第' + str(row+1) + '行，排班性质 减号两边必须是一个数字！')
-                # else:
-                # self.error_message.append('人员表第' + str(row+1) + '行，排班性质 格式不正确')
+                for val in t1.cell(row, 10).value.strip().split('-'):
+                    if val not in shift_in_shift:
+                        self.error_message.append('人员表第' + str(row + 1) + '行，指定排班，没有存在于班次表中' + t1.cell(row, 10).value)
+
 
         if self.error_message:
             return self.error_message
@@ -372,11 +362,11 @@ class scheduling_excel():
                 self.people_info[name]['before_schedule_off_date'] = xlrd.xldate.xldate_as_datetime(
                     t1.cell(row, 4).value, 0) if t1.cell(row, 4).value else (self.date_list[0] + timedelta(days=-2))
                 # 加入日期
-                self.people_info[name]['join_date'] = xlrd.xldate.xldate_as_datetime(t1.cell(row, 5).value,
-                                                                                     0) if t1.cell(row, 5).value else ''
+                self.people_info[name]['join_date'] = \
+                    xlrd.xldate.xldate_as_datetime(t1.cell(row, 5).value,0) if t1.cell(row, 5).value else ''
                 # 离职日期/最后上班日期
-                self.people_info[name]['quit_date'] = xlrd.xldate.xldate_as_datetime(t1.cell(row, 6).value,
-                                                                                     0) if t1.cell(row, 6).value else ''
+                self.people_info[name]['quit_date'] = \
+                    xlrd.xldate.xldate_as_datetime(t1.cell(row, 6).value,0) if t1.cell(row, 6).value else ''
                 # 是否行政班
                 self.people_info[name]['week_rest'] = t1.cell(row, 7).value if t1.cell(row, 7).value else ''
                 # 班次偏好1
@@ -386,8 +376,8 @@ class scheduling_excel():
                 # 排班性质 的左侧 和 右侧
                 self.people_info[name]['continue_work_days'] = CONTINUE_WORK_DAYS
                 self.people_info[name]['continue_rest_days'] = 1
-                self.people_info[name]['appoint_shift'] = str(t1.cell(row, 10).value).split('-')[0] if t1.cell(row,
-                                                                                                               10).value else ''
+                self.people_info[name]['appoint_shift'] =  \
+                    str(t1.cell(row, 10).value).split('-') if t1.cell(row,10).value else ''
 
                 """
                 2019/6/11 add
@@ -463,13 +453,6 @@ class scheduling_excel():
                         total_people = total_people + 1
                 self.every_date_off_num[var1] = total_people - total_shift
 
-        # 计算每个人应该分配的休息天数
-        # for name in self.people_info:
-        #     rest_days, work_days = self.get_people_off_and_work_days(name)
-        #     self.people_info[name]['rest_days'] = rest_days
-        #     # off 与 work的比重
-        #     self.people_info[name]['off_work_rate'] = float((rest_days / work_days))
-        #     # print(self.people_info[name]['off_work_rate'])
         return self.error_message
 
     # 2.生成排班结果数据
@@ -499,15 +482,16 @@ class scheduling_excel():
 
         # 当给某一天排班时，随机从现有人员中选择一人，进行排班，
         # 这样可以有效的避免班次和OFF集中在某个区域的情况
-        people_list = []
-        admin_shift = [] # 存放需要上行政班人员的姓名
+        people_list = [] #存放所有的人员姓名
         middle_list = []  # 存储每一天所对应的dataframe中的数据
         OFF_dic = {}  # 暂时存放连续工作的天数大于指定天数的人员
+        appoint_list = [] # 存放指定排班人员姓名
 
+        # 将人员分类
         for dat in self.date_list:
             for var in self.people_info:
-                if str(self.people_info[var]['week_rest']).upper() == 'Y':
-                    admin_shift.append(var)
+                if len(self.people_info[var]['appoint_shift']) == 2:
+                    appoint_list.append(var)
                 else:
                     people_list.append(var)
 
@@ -520,30 +504,31 @@ class scheduling_excel():
             如果当前人员连续工作的天数大于限定的工作天数则暂时不给该员工进行排班，同时将该员工的姓名作为字
             典的键，连续工作天数作为字典的值存入指定的字典中。
             '''
-
+            # 排指定班次和新政班
             while True:
-                if not admin_shift:
+                if not appoint_list:
                     break
-                Flag = 'ADMIN'
-                admin_person = random.choice(admin_shift)
+                Flag = 'APPOINT'
+                appoint_person = random.choice(appoint_list)
 
                 # 判断当前员工是否已经到岗或离职
-                if (self.people_info[admin_person]['join_date'] and self.people_info[admin_person]['join_date'] > dat) \
-                        or (self.people_info[admin_person]['quit_date'] and self.people_info[admin_person]['quit_date'] < dat):
-                    admin_shift.remove(admin_person)
+                if (self.people_info[appoint_person]['join_date'] and self.people_info[appoint_person]['join_date'] > dat) \
+                        or (self.people_info[appoint_person]['quit_date'] and self.people_info[appoint_person]['quit_date'] < dat):
+                    appoint_list.remove(appoint_person)
                     continue
 
                 # 判断员工某一天是否指定要休息
-                if dat in self.people_info[admin_person]['appoint_rest']:
-                    OFF_dic[admin_person] = 1000
-                    admin_shift.remove(admin_person)
+                if dat in self.people_info[appoint_person]['appoint_rest']:
+                    OFF_dic[appoint_person] = 1000
+                    appoint_list.remove(appoint_person)
                     continue
 
-                for dic in middle_list:
-                    if not dic['appoint'] and dic['date'] == dat and dic['name'] == admin_person:
-                        dic['shift'] = self.get_fit_shift(dic['date'], dic['name'], Flag)
-                        admin_shift.remove(admin_person)
+                for dic2 in middle_list:
+                    if not dic2['appoint'] and dic2['date'] == dat and dic2['name'] == appoint_person:
+                        dic2['shift'] = self.get_fit_shift(dic2['date'], dic2['name'], Flag)
+                        appoint_list.remove(appoint_person)
 
+            # 排其它人员班次
             while True:
                 if not people_list:
                     break
@@ -568,7 +553,6 @@ class scheduling_excel():
                         if type(var2['shift']) is int:
                             OFF_dic[person] = var2['shift']
                         people_list.remove(person)
-            # print(OFF_dic)
 
             '''
             从OFF_dic字典中优先取出连续工作天数最短的人员，进行排班，因为当人员需求没有被满足时，
@@ -584,10 +568,9 @@ class scheduling_excel():
                     if not var3['appoint'] and var3['date'] == dat and var3['name'] == personal:
                         var3['shift'] = self.get_fit_shift(var3['date'], var3['name'],Flag)
                         del OFF_dic[personal]
-            # print(dat)
-
             middle_list.clear()
 
+    # 获取合适的班次
     def get_fit_shift(self, date, people,Flag):
         dic = {}  # 用于打分
         for s in self.shift_info:
@@ -619,7 +602,6 @@ class scheduling_excel():
                 if gz2 and  gz1:
                     dic[s] = dic[s] + 1
 
-
             # OFF平均化,判断当前连续工作天数是否大于或等于指定的天数，
             # 大于的话则执行以下代码，并返回该员工连续工作天数
             continue_WD_web = self.people_info[people]['continue_work_days']
@@ -627,113 +609,18 @@ class scheduling_excel():
             if continue_WD >= continue_WD_web and Flag == 'T':
                 return int(continue_WD)
 
-        if Flag == 'ADMIN':
-            if date.weekday() >= 5:
-                # 判断给当前日期和当前人员排OFF时，当前剩余OFF数量是否足够，如果OFF数量为0，则不能给当前人员强制排OFF
-                if self.current_OFF_num(date):
-                    dic['OFF'] += 10000
-            elif self.sheduling_info['C1'][date] > self.get_arranged('C1', date):
-                dic['C1'] += 10000
+        if Flag == 'APPOINT':
+            '''
+            判断给当前日期和当前人员排指定班次时，当前指定班次的数量是否足够，如果指定班次剩余数量为0，
+            则不能给当前人员强制排第一个指定班次，此时给当前人员排第二个指定班次。
+            '''
+            app_shift = self.people_info[people]['appoint_shift']
+            if date.weekday() >= 5 and self.current_OFF_num(date):
+                dic['OFF'] += 10000
+            elif self.sheduling_info[app_shift[0]][date] > self.get_arranged(app_shift[0], date):
+                dic[app_shift[0]] += 10000
             else:
-                dic['B2'] += 10000
-
-            # 获取平均休息天数和平均班次数量
-            # average_off_num,average_shift_num = self.get_people_off_and_work_days()
-
-            # Thomas code
-
-            # OK 规则3,连续上班天数
-            # gz3 = self.get_people_continue_work_days(date, people) < float(
-            #     self.people_info[people]['continue_work_days'])
-            # if gz3 and gz2 and gz1:
-            #     dic[s] += 1
-
-            # # 规则4 班次平均化
-            # # 获取当前某个人的某个班次已排数量
-            # arranged_shift_num = 0
-            # for var in self.dataframe:
-            #     if people == var['name'] and var['shift'] == s:
-            #         arranged_shift_num += 1
-            # gz4 = arranged_shift_num < average_shift_num
-            # if gz1 and gz4:
-            #     dic[s] += 1
-
-            # # 规则5 OFF 平均化
-            # arranged_OFF_num = 0
-            # for var in self.dataframe:
-            #     if people == var['name'] and var['shift'] == "OFF":
-            #         arranged_OFF_num += 1
-            # gz5 = arranged_OFF_num < average_off_num
-            # if gz5 and gz1:
-            #     dic[s] += 1
-
-            # 规则4，连续休息天数
-            # rest_days = self.get_continue_rest_days(date, people)
-            # gz4 = rest_days >= float(self.people_info[people]['continue_rest_days'])
-            # if gz4 and gz1:
-            #     dic[s] = dic[s] + 1
-
-            # # 规则5，同一个组长的组员班次
-            # gz5 = False
-            # if SAME_GROUP:
-            #     gz5 = (s == self.get_same_group_shift(date, people))
-            #     if gz5 and gz1 and gz2:
-            #         dic[s] = dic[s] + 1
-
-            # # 把OFF的情况，平均分配到各个组中
-            #
-            # # 考虑到班次偏好的情况  2019/6/18 add
-            # gz6 = (s in [self.people_info[people]['banci_pianhao1'], self.people_info[people]['banci_pianhao2']])
-            # if gz6 and gz1:
-            #     dic[s] = dic[s] + 1
-            #
-            # # 排班模板 sheet4 指定休假 的 total列，需要考虑进去  2019/6/20 add
-            # gz7 = self.people_info[people]['total_rest'] > self.get_arranged_shift_by_people(people, 'OFF')
-            # if gz7 and gz1 and gz2:
-            #     dic[s] = dic[s] + 1
-            #
-            # 行政班 为OFF的情况
-            # gz12 = (str(self.people_info[people]['week_rest']).upper() == 'Y')
-            # if gz12 and gz1 and gz2:
-            #     dic[s] = dic[s] + 1
-
-            # 班次分数平均化
-            # if gz1 and gz2:
-            #     # 班次平均分，
-            #     average = self.cal_shift_average_score()
-            #     # 1.获取当前人员已排班次的平均分
-            #     # 2.如果当前人员已排班次的平均分数小于班次平均分并且当前班次的班次分值大于班次平均分数时，给该班次加分
-            #     # 3. 或者当前人员已排班次的平均分数大于班次平均分并且当前班次的班次分值小于班次平均分数是，给该班次加分
-            #     people_avg = self.get_people_arranged_avg_score(people)
-            #     if ((people_avg < average) and (self.shift_info[s]['banci_score'] > average)) or (
-            #             (people_avg > average) and self.shift_info[s]['banci_score'] < average):
-            #         dic[s] = dic[s] + 10
-
-            # 平均化OFF
-            # gz15 = False
-            # if (self.people_info[people]['off_work_rate']) > self.people_info[people]['continue_rest_days'] / \
-            #         self.people_info[people]['continue_work_days']:
-            #     s_num = 0  # 排班数量
-            #
-            #     for s1 in self.shift_info:
-            #         s_num = s_num + self.get_arranged_shift_by_people(people, s1, date)
-            #
-            #     if s_num != 0 and (off_days_num > self.get_arranged('OFF', date)):
-            #         if (self.people_info[people]['off_work_rate'] > self.get_arranged_shift_by_people(people, 'OFF',
-            #                                                                                           date) / s_num) or (
-            #                 self.get_arranged_shift_by_people(people, 'OFF', date) == 0):
-            #             dic['OFF'] = dic['OFF'] + 1
-            #             gz15 = True
-            #
-            # #  (off_days > self.get_arranged('OFF',date))  实际dataFrame ,OFF未排满
-            # if (not gz3) and (off_days_num > self.get_arranged('OFF', date)) and gz15 and (not gz12):
-            #     dic['OFF'] = dic['OFF'] + 1
-            #
-            # # 针对前一天是休息的情况。决定是否连续休息
-
-            # if (not gz4) and (rest_days >= 1) and (off_days_num > self.get_arranged('OFF', date)) and gz15 and (
-            #         not gz12):
-            #     dic['OFF'] = dic['OFF'] + 1
+                dic[app_shift[1]] += 10000
 
         # 返回权重最高的班次,就是dic字典中value值最大的那个key
         return max(dic, key=dic.get)
@@ -795,8 +682,6 @@ class scheduling_excel():
                         total_score_temp = total_score_temp + (
                                     self.shift_info[s]['banci_score'] * self.sheduling_info[s][d2])
 
-        # print(total_score_temp) # 32720.0
-        # print(total_shift_temp) # 968.0
         return int(total_score_temp / total_shift_temp)
 
     def get_people_off_and_work_days(self):
@@ -821,24 +706,6 @@ class scheduling_excel():
             for var in self.every_date_off_num:
                 if var == d:
                     off_num = off_num + self.every_date_off_num[d]
-
-        # 计算这个人的工作天数
-        # not_work_days = 0
-        # for d in self.date_list:
-        #     for p in self.people_info:
-        #         # 加入日期，离职日期,班次为空
-        #         if p == name:
-        #             if ((self.people_info[p]['join_date'] and self.people_info[p]['join_date'] > d) or (
-        #                     self.people_info[p]['quit_date'] and self.people_info[p]['quit_date'] < d)):
-        #                 not_work_days = not_work_days + 1
-        # work_days = len(self.date_list) - not_work_days
-
-        # test code
-        # print('工作天数：',work_days) # 工作天数： 31
-        # print('没有工作的天数',not_work_days) # 没有工作的天数 0
-        # print('总人力：',total_people_temp) # 总人力： 1364
-        # print('总班次：',total_shift_temp) # 总班次： 968.0
-        # print('总OFF数量：',off_num) # 总OFF数量： 396.0
 
         average_off_num = round(off_num / len(self.people_info))
 
@@ -1139,7 +1006,6 @@ class scheduling_excel():
             worksheetAlert.write(n + 1, 2, d[2], format)
             # worksheetAlert.write(n+1, 3, "两个班次之间的休息时间小于%d小时" % REST_HOURS )
             worksheetAlert.merge_range(n + 1, 3, n + 1, 6, "两个班次之间的休息时间小于%d小时" % REST_HOURS, format)
-
 
         workbook.close()
 

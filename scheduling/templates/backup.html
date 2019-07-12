@@ -1,0 +1,134 @@
+<html>
+{% load staticfiles %}
+	<head>
+		<meta charset="utf-8">
+		<title>排班</title>
+		<meta content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" name="viewport">
+{#	    <link rel="stylesheet" type="text/css" href="{% static 'css/bootstrap.min.css' %}">#}
+		<link rel="stylesheet" type="text/css" href="{% static 'css/font-awesome.min.css' %}">
+		<script src="{% static 'js/jquery.min.js' %}" ></script>
+		<script src="{% static 'js/bootstrap.min.js' %}" ></script>
+
+        <style>
+            div,body,h1,h2,h3,h4,h5,h6,p{
+                            margin:0;
+                            padding:0;
+                            list-style:none;
+                        }
+            body{
+                    color:black;
+                    background:pink;
+                    padding-top:10px;
+                        }
+            #content p{
+                padding-top:20px;
+                font-size:20px;
+            }
+            #container{
+                width:500px;
+                margin:0 auto;
+            }
+            #close{
+                float:right;
+            }
+            #error_msg{
+                background:red;
+                font-size:20px;
+            }
+            #close{
+                background:greenyellow;
+                border:0px;
+                padding:0px;
+                width:20px;
+                margin-left:5px;
+                height:25px;
+            }
+        </style>
+	</head>
+
+	<body>
+        <div id='container'>
+            <div id="footer">
+                <h1>800Teleservices 排班工具</h1>
+            </div>
+            <div id="content">
+                <form action="" method="post" enctype="multipart/form-data">{% csrf_token %}
+                    <p>
+                       选择需要进行排班的Excel文件 <br>
+                        <input class="form-control" type="file" id="excel" name="excel">
+                    </p>
+                    <p>
+                       填写班次间隔时间(小时)<br>
+                        <input type="text" id="rest_hours" name="rest_hours" value="12">
+                    </p>
+                    <p>
+                        填写连续工作不得超过的天数 <br>
+                        <input type="text" id="continue_work_days" name="continue_work_days" value="4">
+                    </p>
+                    <p>
+                        <form action="/get_template/" method="post">{% csrf_token %}
+                            <button type="submit" class="btn btn-primary pull-center" style="margin-right: 5px;">
+                            <i class="fa fa-download"></i> 下载模板
+				            </button>
+		                </form>
+                        <input type="submit" class="btn btn-primary" onclick="return submit_check()" value="提交" />
+                    </p>
+                </form>
+            </div>
+        </div>
+
+       {% if error_message %}
+            <div id="error_msg">
+                <button type="button" id="close" onclick="close_message()">&times;</button>
+                {% for error in error_message %}
+			    	<p>{{ error }}</p>
+		    	{% endfor %}
+            </div>
+        {% endif %}
+
+	<script>
+
+    function close_message(){
+        $('#error_msg').remove()
+    }
+
+	function submit_check()
+	{
+		if (document.getElementById('excel').value.length === 0)
+		{
+			alert("请先选择Excel文件！");
+			return false;
+		}
+		if (document.getElementById('continue_work_days').value.length === 0)
+		{
+			alert("请先填写连续作休天数！");
+			return false;
+		}
+
+		if (document.getElementById('sleep_hours').value.length === 0)
+		{
+			alert("请先填写班次间隔时间！");
+			return false;
+		}
+		if (isNaN(document.getElementById('continue_work_days').value) || isNaN(document.getElementById('continue_sleep_days').value) )
+		{
+			alert("作息天数必须为数字！");
+			return false;
+		}
+		if (isNaN(document.getElementById('sleep_hours').value))
+		{
+			alert("班次间隔必须为数字！");
+			return false;
+		}
+		return true;
+	}
+
+	$(function(){
+		$(".close").click(function(){
+			$("#myAlert").alert('close');
+		});
+	});
+	</script>
+	</body>
+
+</html>
